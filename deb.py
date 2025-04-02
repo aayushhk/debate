@@ -1,10 +1,13 @@
 import openai
 import streamlit as st
 import time
+import speech_recognition as sr
+import random
 
-# OpenAI Client
+# Define available voices
+available_voices = ["ash", "echo", "fable", "onyx", "shimmer"]
 
-
+# Define Religions
 sanatan = {
     "rel": "Hindu",
     "language": "Hindi",
@@ -17,7 +20,6 @@ sanatan = {
         "Shlok", "Doha", "Chhand", "Padya", "Chaupai",
         "Kabita", "Gatha", "Shair", "Shabda"
     },
-   
 }
 christianity = {
     "rel": "Christian",
@@ -46,126 +48,113 @@ islam = {
         "Sunnah", "Qasas", "Fatwa", "Quranic Verse"
     },
 }
-
 st.set_page_config(page_title="Sage vs. Sage - Wisdom Duel", layout="wide")
 
+# Sidebar Configuration
 religion = sanatan
 with st.sidebar:
-    api_keys=st.text_input("Enter OPENAI API Key")
-    client = openai.OpenAI(api_key=api_keys)
-    rel=st.radio("Select Religion",["Hindu","Christian","Islam"])
-    if rel=="Hindu":
-        religion = sanatan  # Assign religion
-    elif rel=="Islam":
+    api_keys = st.text_input("Enter OPENAI API Key", type="password")
+    if api_keys:
+        client = openai.OpenAI(api_key=api_keys)
+    else:
+        st.error("Please enter a valid OpenAI API Key")
+        st.stop()
+    
+    rel = st.radio("Select Religion", ["Hindu", "Christian", "Islam"])
+    if rel == "Hindu":
+        religion = sanatan
+    elif rel == "Islam":
         religion = islam
     else:
         religion = christianity
 
-    iter=st.slider("Select Iterations",1,10,1)
-    st.info(f"Current religion :  {religion['rel']}")
-    st.info(f"Language :  {religion['language']}")
+    num_chars = st.slider("Number of Characters (Sages)", 2, 5, 2)
+    
+    iter = st.slider("Debate Iterations", 1, 10, 1)
 
-# Initialize session state variables
-if "messages" not in st.session_state:
-    st.session_state.messages = []  # Stores conversation history
+    st.info(f"Current Religion: {religion['rel']}")
+    st.info(f"Language: {religion['language']}")
 
-# Function to generate a response
-def generate_sage_response(speaker, context):
+# Assign unique voices to sages
+def assign_sage_voices(num_sages):
+    return random.sample(available_voices, num_sages)
+
+# Generate Response
+def generate_sage_response(speaker, context, voice):
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=context,
-        temperature=0.5,
-        
+        temperature=0.4,
     )
     sage_text = response.choices[0].message.content
 
-    voice = "onyx" if speaker == "🧙 Sage 1" else "fable"
     sage_voice = client.audio.speech.create(
-        model="gpt-4o-mini-tts",
+        model="tts-1-hd",
         voice=voice,
         input=sage_text,
-       
-    )
-    col3 =st.container(border=True)
-    with col3:
-    # Display response in an expander
-        col1, col2 = st.columns([1, 2])
     
-            # Adjust layout
+        )
+
+    col3 = st.container()
+    with col3:
+        col1, col2 = st.columns([1, 2])
         with col1:
-                with st.expander(f"{speaker} says:", expanded=False):
-                    st.markdown(f"<p style='font-size:16px; line-height:1.6;'>{sage_text}</p>", unsafe_allow_html=True)
+            with st.expander(f"{speaker} says:", expanded=False):
+                st.markdown(
+                    f"<p style='font-size:16px; line-height:1.6;'>{sage_text}</p>",
+                    unsafe_allow_html=True,
+                )
         with col2:
             st.audio(sage_voice.content)
 
-        return sage_text
+    return sage_text
 
-# Function to process user input and start discussion
+# Start Debate
 def start_sage_discussion(topic):
-    # Initialize conversation
-    st.session_state.messages.append({"role": "user", "content": topic})
-
     context = [
-        {"role": "system", "content": f"You are a wise saint speaking in {religion['language']}. Engage in a philosophical debate using examples from {religion['books']}. Keep it warm and respectful and within 200 words. Point out mistakes, provide insights"},
+        {"role": "system", "content": f'''You are a wise saint speaking in pure {religion['language']} language. Use examples from {religion['books']}. Provide refrences and specific events. Keep it warm, philosophical, within 60 seconds, and respectful. Point out mistakes, provide insights. '''},
         {"role": "user", "content": topic}
     ]
 
-    # Sage 1's Opening Statement
-    sage1_text = generate_sage_response("🧙 Sage 1", context)
+    sage_voices = assign_sage_voices(num_chars)
+    
+    # Opening by Sage 1
+    sage1_text = generate_sage_response("🧙 Sage 1", context, sage_voices[0])
     context.append({"role": "assistant", "content": sage1_text})
-    time.sleep(2)
+    
 
-    # Continuous back-and-forth discussion
-    for _ in range(iter):  # Number of rounds
-        context.append({"role": "system", "content": "Now, you are another saint. Either correct, expand, or challenge the previous statement with deeper insights."})
-        sage2_text = generate_sage_response("🧙‍♂️ Sage 2", context)
-        context.append({"role": "assistant", "content": sage2_text})
-        time.sleep(2)
+    for round_num in range(iter):
+        for i in range(2, num_chars + 1):
+            context.append({"role": "system", "content": f"Now, you are Sage {i}. Respond, challenge, or expand respectfully."})
+            sage_text = generate_sage_response(f"🧙‍♂️ Sage {i}", context, sage_voices[i-1])
+            context.append({"role": "assistant", "content": sage_text})
+            
 
-        context.append({"role": "system", "content": "Now, return as the first sage and counter the argument, provide new insights, or refine your explanation."})
-        sage1_text = generate_sage_response("🧙 Sage 1", context)
+        context.append({"role": "system", "content": "Return to Sage 1 to counter the arguments."})
+        sage1_text = generate_sage_response("🧙 Sage 1", context, sage_voices[0])
         context.append({"role": "assistant", "content": sage1_text})
-        time.sleep(2)
+        
 
-# Streamlit UI
+# UI
+st.header("🦚Samwaad")
+st.markdown("***A Philosophical Debate between Sages***")
+st.session_state.transcription_text =""
+col1=st.container(border=True)
+with col1:
+    topic = st.text_input("Enter a topic for discussion:", placeholder="e.g. The nature of Dharma")
+    audio_value = st.audio_input("Record a voice message")
+    if audio_value:
+        transcription = client.audio.translations.create(
+            model="whisper-1",
+            file=audio_value
+        )
+        st.session_state.transcription_text = transcription.text.strip()
+        st.success(f"**Topic:** {st.session_state.transcription_text}")
+    startt=st.button("⚔️ Start Debate")
+  
 
-
-st.markdown(
-    "<h1>🧙 Sage vs. Sage - Wisdom Duel ⚔️</h1>",
-    unsafe_allow_html=True,
-)
-
-
-
-topic = st.text_input("Enter a topic for discussion:", placeholder="e.g. The nature of Dharma")
-
-
-st.markdown(
-    """<style>
-    div.stButton > button {
-        background-color: #6A0DAD;
-        color: white;
-        font-size: 18px;
-        padding: 10px 20px;
-        border-radius: 10px;
-    }
-    div.stButton > button:hover {
-        background-color: #4B0082;
-    }
-    </style>""",
-    unsafe_allow_html=True,
-)
-if st.button("⚔️ Start Debate"):
-    if topic:
-        st.markdown("<hr style='border: 1px solid #5A189A;'>", unsafe_allow_html=True)
-        start_sage_discussion(topic)
+if startt:
+    if topic or transcription:
+        start_sage_discussion(topic+" " + st.session_state.transcription_text)
     else:
         st.error("⚠️ Please enter a topic first!")
-
-# Display conversation history
-with st.sidebar:
-    if st.session_state.messages:
-        st.subheader("📜 Conversation History:")
-        for msg in st.session_state.messages:
-            role = "👤 **You:**" if msg["role"] == "user" else msg["role"]
-            st.markdown(f"{role} {msg['content']}")
