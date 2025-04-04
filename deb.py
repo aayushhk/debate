@@ -54,7 +54,7 @@ st.session_state.transcription_text = ""
 # Sidebar Configuration
 religion = sanatan
 with st.sidebar:
-    api_keys = "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"
+    api_keys = "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"
     if api_keys:
         client = openai.OpenAI(api_key=api_keys)
     else:
