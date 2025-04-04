@@ -49,11 +49,12 @@ islam = {
     },
 }
 st.set_page_config(page_title="Sage vs. Sage - Wisdom Duel", layout="wide")
+st.session_state.transcription_text = ""
 
 # Sidebar Configuration
 religion = sanatan
 with st.sidebar:
-    api_keys = st.text_input("Enter OPENAI API Key", type="password")
+    api_keys = "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"
     if api_keys:
         client = openai.OpenAI(api_key=api_keys)
     else:
@@ -112,7 +113,7 @@ def generate_sage_response(speaker, context, voice):
 # Start Debate
 def start_sage_discussion(topic):
     context = [
-        {"role": "system", "content": f'''You are a wise saint speaking in pure {religion['language']} language. Use examples from {religion['books']}. Provide refrences and specific events. Keep it warm, philosophical, within 60 seconds, and respectful. Point out mistakes, provide insights. '''},
+        {"role": "system", "content": f'''You are a {religion["rel"]} experienced Sage. You are a wise saint speaking in pure {religion['language']} language. Use examples from {religion['books']}. You belong to {religion['rel']} Community. Provide refrences and specific events. Keep it warm, philosophical, within 60 seconds, and respectful. Point out mistakes, provide insights. '''},
         {"role": "user", "content": topic}
     ]
 
@@ -156,5 +157,6 @@ with col1:
 if startt:
     if topic or transcription:
         start_sage_discussion(topic+" " + st.session_state.transcription_text)
+        st.session_state.transcription_text = ""
     else:
         st.error("⚠️ Please enter a topic first!")
